@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>My first three.js app</title>
+    <style>
+        body { margin: 0; }
+    </style>
+</head>
+<body>
+
+<script src="./three.min.js"></script>
+<script src="./GLTFLoader.js"></script>
+<script src="./OrbitControls.js"></script>
+<script src="./postprocessing.min.js"></script>
+<script >
+    const renderer = new THREE.WebGLRenderer();
+    const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.01, 1000);
+    const scene = new THREE.Scene();
+    let Mesh;
+    let light;
+    let composer;
+
+    function init() {
+        scene.background = new THREE.Color('black');
+        camera.position.set(0, 2, 4);
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        document.body.appendChild(renderer.domElement);
+
+        controls = new THREE.OrbitControls(camera, renderer.domElement);
+        controls.target.set(0, 0, 0);
+        controls.enablePan = true;
+        controls.maxPolarAngle = Math.PI / 2;
+        controls.enableDamping = true;
+        controls.minDistance = 0.5
+        controls.maxDistance = 10
+        controls.zoomSpeed = 0.8
+
+
+  window.requestAnimationFrame(animate);
+    }
+
+    function setLight() {
+        light = new THREE.AmbientLight(0xffffff, 2.5); // soft white light
+        scene.add(light);
+        // const directionalLight = new THREE.DirectionalLight( 0xffffff, 0.5 ); 
+        // scene.add( directionalLight );
+    }
+
+    function loadGLTF() {
+        let balloonLoader = new THREE.GLTFLoader();
+
+        balloonLoader.load('./model/test1.gltf', (gltf) => {
+            Mesh = gltf.scene;
+            Mesh.scale.set(0.2,0.2,0.2);
+            scene.add(Mesh);
+            Mesh.position.x = 0;
+            Mesh.position.y = 0;
+            Mesh.position.z = 0;
+        });
+    }
+  
+    function animate() {
+       
+        controls.update() 
+        renderer.render(scene, camera);
+    
+        requestAnimationFrame(animate);
+        // if (Mesh && Mesh.rotation) {
+        //     Mesh.rotation.y -= 0.005;
+        // }
+    }
+
+    init();
+    setLight();
+    loadGLTF();
+    animate();
+</script>
+</body>
+</html>
