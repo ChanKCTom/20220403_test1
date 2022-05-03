@@ -1,79 +1,252 @@
 <!DOCTYPE html>
-<html>
-<head>
-    <title>My first three.js app</title>
-    <style>
-        body { margin: 0; }
-    </style>
-</head>
-<body>
+<html lang="en">
+	<head>
+		<title>Tom's Room</title>
+		<meta charset="utf-8">
+		<meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+	</head>
+	<body style = "margin: 0px">
 
-<script src="./three.min.js"></script>
-<script src="./GLTFLoader.js"></script>
-<script src="./OrbitControls.js"></script>
-<script src="./postprocessing.min.js"></script>
-<script >
-    const renderer = new THREE.WebGLRenderer();
-    const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.01, 1000);
-    const scene = new THREE.Scene();
-    let Mesh;
-    let light;
-    let composer;
+		<div id="container"></div>
+		<script type="importmap">
+			{
+				"imports": {
+					"three": "./build/three.module.js"
+				}
+			}
+		</script>
+		<script src="./tween.umd.js" integrity="sha512-lIKG1kC5TMb1Zx32vdz1n31YJMZRknVY20U9MJ28hD3y2c0OKN0Ce5NhJji78v8zX5UOSsm+MTBOcJt7yMBnSg==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+		<script type="module">
 
-    function init() {
-        scene.background = new THREE.Color('black');
-        camera.position.set(0, 2, 4);
-        renderer.setSize(window.innerWidth, window.innerHeight);
-        document.body.appendChild(renderer.domElement);
+			import * as THREE from 'three';
 
-        controls = new THREE.OrbitControls(camera, renderer.domElement);
-        controls.target.set(0, 0, 0);
-        controls.enablePan = true;
-        controls.maxPolarAngle = Math.PI / 2;
-        controls.enableDamping = true;
-        controls.minDistance = 0.5
-        controls.maxDistance = 10
-        controls.zoomSpeed = 0.8
+			import { OrbitControls } from './jsm/controls/OrbitControls.js';
+			import { GLTFLoader } from './jsm/loaders/GLTFLoader.js';
+			import { EffectComposer } from './jsm/postprocessing/EffectComposer.js';
+			import { RenderPass } from './jsm/postprocessing/RenderPass.js';
+			import { UnrealBloomPass } from './jsm/postprocessing/UnrealBloomPass.js';
+			
+			let camera, controls;
+			let composer, renderer, scene, camera1, loader, mixer;
+			let material , cube, cubeCamera, model,  orbit;
+			let mousePos = new THREE.Vector2(0,0);
+			
+
+			function onWindowResize() {
+
+				const width = window.innerWidth;
+				const height = window.innerHeight;
+
+				camera.aspect = width / height;
+				camera.updateProjectionMatrix();
+
+				renderer.setSize( width, height );
+				composer.setSize( width, height );
+
+				}
+
+			function onMouseMove(e) {
+
+				let x = e.clientX - innerWidth * 0.5; 
+				let y = e.clientY - innerHeight * 0.5;
+				mousePos.x = x * 0.0005;
+				mousePos.y = y * 0.0005;}
 
 
-  window.requestAnimationFrame(animate);
-    }
 
-    function setLight() {
-        light = new THREE.AmbientLight(0xffffff, 2.5); // soft white light
-        scene.add(light);
-        // const directionalLight = new THREE.DirectionalLight( 0xffffff, 0.5 ); 
-        // scene.add( directionalLight );
-    }
+			function onWheel(e){
+				//deep copy orbit to orbitTarget
 
-    function loadGLTF() {
-        let balloonLoader = new THREE.GLTFLoader();
+				let orbitTarget = new THREE.Vector3(0,0,0)
+				orbitTarget.x = orbit.position.x
+				orbitTarget.y = orbit.position.y
+				orbitTarget.z = orbit.position.z 
+				console.log(orbit.position)
+				
+				// CameraTarget.z -= e.deltaY*0.1
+				orbitTarget.y -= e.deltaY*3
 
-        balloonLoader.load('./model/test1.gltf', (gltf) => {
-            Mesh = gltf.scene;
-            Mesh.scale.set(0.2,0.2,0.2);
-            scene.add(Mesh);
-            Mesh.position.x = 0;
-            Mesh.position.y = 0;
-            Mesh.position.z = 0;
-        });
-    }
-  
-    function animate() {
-       
-        controls.update() 
-        renderer.render(scene, camera);
-    
-        requestAnimationFrame(animate);
-        // if (Mesh && Mesh.rotation) {
-        //     Mesh.rotation.y -= 0.005;
-        // }
-    }
+				let orbitTween = new TWEEN.Tween(orbit.position)
+				.to(orbitTarget,500)
+				.easing(TWEEN.Easing.Quadratic.Out)
+				.start()
+			
+			}
+			
+			
+			function addPointLight(lightName, lightColor, Strength, x, y, z){
+					
+					lightName = new THREE.PointLight( lightColor, Strength );
+					lightName.position.set(x,y,z); // threejs x, y,z = blender x,z, -y 
 
-    init();
-    setLight();
-    loadGLTF();
-    animate();
-</script>
-</body>
+					//Set shadow bias to negative close to zero, so that the meshes can cast and receive shadow at the same time, otherwise there will be shadow stripe artifact 
+					lightName.castShadow = true
+					lightName.shadow.bias = -0.001
+					lightName.shadow.mapSize.width = 4096
+					lightName.shadow.mapSize.height = 4096
+					lightName.distance = 4500
+					scene.add(lightName);}
+			
+
+			function init() {
+				
+				const container = document.getElementById( 'container' );
+
+
+				renderer = new THREE.WebGLRenderer( { antialias: true } );
+				renderer.setSize( window.innerWidth, window.innerHeight );
+				container.appendChild( renderer.domElement );
+
+				scene = new THREE.Scene();
+				camera = new THREE.PerspectiveCamera(15, window.innerWidth / window.innerHeight, 10, 10000);
+				camera.position.set(-45 , 4000 , 5000);
+
+				let lookAt = new THREE.Vector3(0,0,0)
+				scene.add(camera);
+				camera.lookAt(lookAt)
+			
+				
+				//set shadowmap so that there is shadow
+				renderer.shadowMap.enabled = true
+				renderer.shadowMap.type = THREE.PCFSoftShadowMap
+
+
+				// orbit control, must add control.update in animate function
+				// controls = new OrbitControls( camera, renderer.domElement );
+				// controls.maxPolarAngle = Math.PI * 0.5;
+				// controls.minDistance = 1;
+				// controls.maxDistance = 100;
+				// controls.enableDamping = true;
+
+				scene.add( new THREE.AmbientLight( 0x404040 , 0.5) );
+
+				
+
+
+				let pointLight1
+				addPointLight(pointLight1, 0xFFFFFF, 2, 60, 10 , 0)
+			
+				let pointLight4
+				addPointLight(pointLight4, 0xFFFFFF, 3, -115, -1000 , 1000)
+		
+
+				const cubeRenderTarget = new THREE.WebGLCubeRenderTarget( 128, { generateMipmaps: true, minFilter: THREE.LinearMipmapLinearFilter } );
+				cubeCamera = new THREE.CubeCamera( 1, 100000, cubeRenderTarget );
+				scene.add( cubeCamera );
+				cubeCamera.position.set(0, -30, 0);
+				
+				
+				loader = new GLTFLoader(); //OOP javascript, class, constructor, instantiating an object  = call the constructor, 
+				//GLTFLoader is a class, "load" is a method
+				
+
+			
+
+				function loadedCallback( gltf ) { //promise, call back function, async awake, arrow function
+
+					model = gltf.scene;
+					model.castShadow = false;
+					scene.add( model );
+
+					mixer = new THREE.AnimationMixer(model)
+					const clips = gltf.animations
+					
+					function playClip ( clip ) {
+						mixer.clipAction(clip).play()
+					}
+
+					clips.forEach(playClip) //array.prototype.foreach
+
+
+					
+	
+					//to change all the meshes in the model so that they cast and receive shadow
+					function checkChild (child) { 
+						if ( child.isMesh ) { 
+							child.receiveShadow = true; 
+							child.castShadow = true;
+							child.material.envMap = cubeRenderTarget.texture;
+						}
+					}
+
+					model.traverse(checkChild);
+
+
+
+					// This cubeCamera update thing has to be after GLTF loader
+					cubeCamera.updateCubeMap(renderer, scene);	
+				
+
+				}
+
+				loader.load( 'model/5.gltf', loadedCallback); 
+				
+				//the second argument is a function, so the function(loadedCallBack) must be defined first before this line
+				//it is a defined method of a class of GLTFLoader
+
+			
+				
+			
+
+
+
+				const renderScene = new RenderPass( scene, camera );
+				const bloomPass = new UnrealBloomPass( new THREE.Vector2( window.innerWidth, window.innerHeight ) );
+				bloomPass.threshold = 0.05
+				bloomPass.strength = 0.5
+				bloomPass.radius = 0
+
+				composer = new EffectComposer( renderer );
+				composer.addPass( renderScene );
+				composer.addPass( bloomPass );
+
+				
+				
+				orbit = new THREE.Object3D();
+				orbit.rotation.order = "YXZ";
+				orbit.position.copy(lookAt);
+				scene.add(orbit)
+				orbit.add(camera);
+
+			
+
+				}
+
+
+				const clock = new THREE.Clock()
+
+			function animate() {
+				// controls.update();
+				
+				orbit.rotation.y = orbit.rotation.y * 0.8 -  mousePos.x * 0.2;
+				orbit.rotation.x = orbit.rotation.x * 0.8 -  mousePos.y * 0.2;
+				orbit.rotation.z = 0; //this is important to keep the camera level..
+				TWEEN.update()
+				composer.render()
+
+				if(mixer){mixer.update(clock.getDelta())}
+				
+				
+				
+		
+				
+				requestAnimationFrame(animate );
+				
+				
+
+			}
+			
+			init();
+			animate();
+
+			window.addEventListener( 'resize', onWindowResize );
+			document.addEventListener('wheel', onWheel)
+			document.addEventListener('mousemove', onMouseMove)
+
+	
+			
+		</script>
+
+	</body>
+
 </html>
